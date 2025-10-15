@@ -350,11 +350,21 @@ function CottonResultsDashboard() {
   onClick={async () => {
     try {
       const response = await fetch('https://cotton-api-ekdn.onrender.com/wake');
-      if (response.ok) alert('Backend wake request sent!');
-      else alert('Failed to wake backend');
+      if (!response.ok) {
+        alert('Failed to wake backend');
+        return;
+      }
+
+      // Parse JSON response (if using JSON)
+      const data = await response.json();
+      if (data.success) {
+        alert('Server is running!');
+      } else {
+        alert('Server request failed');
+      }
     } catch (err) {
       console.error(err);
-      alert('Error pinging backend');
+      alert('Error contacting Server');
     }
   }}
 >
