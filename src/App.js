@@ -8,18 +8,31 @@ function App() {
   const [activeTab, setActiveTab] = useState("cotton");
 
   const tabs = [
-    { id: "cotton", label: "Cotton Results" },    
+    { id: "cotton", label: "Cotton Results" },
     { id: "issues", label: "Issue Update" },
     { id: "summary", label: "Summary Report" },
     { id: "analysis", label: "Analysis" },
   ];
 
+  const goBack = () => {
+    window.location.href = "https://sagar.smpl-qa-manthan.workers.dev/protected.html";
+  };
+
   return (
     <div className="min-h-screen w-full p-2 bg-orange-100">
-      {/* Dashboard title */}
-      <h1 className="text-4xl font-extrabold text-center mb-6 text-red-600">
-        Cotton Quality Dashboard
-      </h1>
+      {/* Dashboard title and Home button */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-4xl font-extrabold text-center text-red-600 flex-1">
+          Cotton Quality Dashboard
+        </h1>
+
+        <button
+          onClick={goBack}
+          className="px-4 py-2 bg-purple-500 font-bold text-white rounded shadow hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          ← Home
+        </button>
+      </div>
 
       {/* Tabs */}
       <div className="flex justify-start gap-6 mb-8">
