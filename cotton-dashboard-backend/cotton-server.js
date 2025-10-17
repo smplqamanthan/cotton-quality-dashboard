@@ -1058,6 +1058,25 @@ app.get("/api/cotton-mixing-summary", async (req, res) => {
       return [...new Set(values.map((value) => String(value).trim()).filter((value) => value !== ""))];
     };
 
+    if (enableSummaryDebug) {
+      const issuePreview = (rawIssueData ?? []).slice(0, 20);
+      console.log("[Summary][Backend] issueQuery count:", rawIssueData?.length ?? 0);
+      console.table(
+        issuePreview.map((row) => ({
+          mixing_no: row?.mixing_no,
+          unit: row?.unit,
+          line: row?.line,
+          cotton: row?.cotton,
+          issue_date: row?.issue_date,
+        }))
+      );
+      if ((rawIssueData?.length ?? 0) > issuePreview.length) {
+        console.log(
+          `[Summary][Backend] issueQuery preview truncated to ${issuePreview.length} of ${rawIssueData.length} rows.`
+        );
+      }
+    }
+
     let issueData = rawIssueData ?? [];
     let normalizedCottonFilters = [];
 
@@ -1584,43 +1603,59 @@ if (!issueData || issueData.length === 0) {
         
 // cotton-server.js, within the weekly branch where relevantMixingData is built
   const relevantMixingData = mixingData.filter((m) => {
-  const mixingValue = m?.mixing_no === undefined || m?.mixing_no === null ? "" : `${m.mixing_no}`.trim();
-  const normalizedRowUnit = String(m?.unit ?? "").trim();
-  const normalizedGroupUnit = String(group?.unit ?? "").trim();
-  const normalizedRowLine = String(m?.line ?? "").trim();
-  const normalizedGroupLine = String(group?.line ?? "").trim();
-  const normalizedRowCotton = String(m?.cotton ?? "").trim().toUpperCase();
-  const normalizedGroupCotton = String(group?.cotton ?? "").trim().toUpperCase();
+    const mixingValue = m?.mixing_no === undefined || m?.mixing_no === null ? "" : `${m.mixing_no}`.trim();
+    const normalizedRowUnit = String(m?.unit ?? "").trim();
+    const normalizedGroupUnit = String(group?.unit ?? "").trim();
+    const normalizedRowLine = String(m?.line ?? "").trim();
+    const normalizedGroupLine = String(group?.line ?? "").trim();
+    const normalizedRowCotton = String(m?.cotton ?? "").trim().toUpperCase();
+    const normalizedGroupCotton = String(group?.cotton ?? "").trim().toUpperCase();
 
-  const matchesGroupUnit = normalizedRowUnit === normalizedGroupUnit;
-  const matchesGroupLine = normalizedRowLine === normalizedGroupLine;
-  const matchesGroupCotton = normalizedRowCotton === normalizedGroupCotton;
+    const matchesGroupUnit = normalizedRowUnit === normalizedGroupUnit;
+    const matchesGroupLine = normalizedRowLine === normalizedGroupLine;
+    const matchesGroupCotton = normalizedRowCotton === normalizedGroupCotton;
 
-  const matchesUnitFilter =
-    unitFilters.length === 0 ||
-    unitFilters.some((value) => String(value ?? "").trim() === normalizedRowUnit);
+    const matchesUnitFilter =
+      unitFilters.length === 0 ||
+      unitFilters.some((value) => String(value ?? "").trim() === normalizedRowUnit);
 
-  const matchesLineFilter =
-    lineFilters.length === 0 ||
-    lineFilters.some((value) => String(value ?? "").trim() === normalizedRowLine);
+    const matchesLineFilter =
+      lineFilters.length === 0 ||
+      lineFilters.some((value) => String(value ?? "").trim() === normalizedRowLine);
 
-  const matchesCottonFilter =
-    cottonFilters.length === 0 ||
-    cottonFilters.some((value) => String(value ?? "").trim().toUpperCase() === normalizedRowCotton);
+    const matchesCottonFilter =
+      cottonFilters.length === 0 ||
+      cottonFilters.some((value) => String(value ?? "").trim().toUpperCase() === normalizedRowCotton);
 
-  const passes =
-    mixingValue &&
-    mixingNoValues.includes(mixingValue) &&
-    matchesGroupUnit &&
-    matchesGroupLine &&
-    matchesGroupCotton &&
-    matchesUnitFilter &&
-    matchesLineFilter &&
-    matchesCottonFilter;
+    const passes =
+      mixingValue &&
+      mixingNoValues.includes(mixingValue) &&
+      matchesGroupUnit &&
+      matchesGroupLine &&
+      matchesGroupCotton &&
+      matchesUnitFilter &&
+      matchesLineFilter &&
+      matchesCottonFilter;
 
+    return passes;
+  });
 
-  return passes;
-});
+  if (enableSummaryDebug) {
+    console.log("[Summary][Backend] mixingData count:", mixingData?.length ?? 0);
+    const mixingPreview = (mixingData ?? []).slice(0, 20);
+    console.table(
+      mixingPreview.map((row) => ({
+        mixing_no: row?.mixing_no,
+        lot_no: row?.lot_no,
+        issue_date: row?.issue_date,
+      }))
+    );
+    if ((mixingData?.length ?? 0) > mixingPreview.length) {
+      console.log(
+        `[Summary][Backend] mixingData preview truncated to ${mixingPreview.length} of ${mixingData.length} rows.`
+      );
+    }
+  }
 
 
         // For each mixing row, determine the period label/sort key based on its issue date
