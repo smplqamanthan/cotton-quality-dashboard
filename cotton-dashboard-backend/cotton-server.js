@@ -1115,6 +1115,13 @@ if (!issueData || issueData.length === 0) {
       mixingQuery = mixingQuery.in("cotton", effectiveCottonFilters);
     }
 
+    if (from_date) {
+      mixingQuery = mixingQuery.gte("issue_date", from_date);
+    }
+    if (to_date) {
+      mixingQuery = mixingQuery.lte("issue_date", to_date);
+    }
+
     const { data: mixingData, error: mixingError } = await mixingQuery;
     if (mixingError) throw mixingError;
 
@@ -1163,17 +1170,29 @@ if (!issueData || issueData.length === 0) {
         const noOfLots = uniqueLots.length;
 
         // Calculate mixing number range
-        const mixingNumbers = [...new Set(rows.map(r => r.mixing_no))]
-          .map(n => Number(n))
-          .filter(n => !Number.isNaN(n))
+        const mixingNumbersRaw = [...new Set(rows.map((r) => r.mixing_no))];
+        const validNumericMixingNumbers = mixingNumbersRaw
+          .map((value) => {
+            const num = Number(value);
+            return Number.isNaN(num) ? null : num;
+          })
+          .filter((value) => value !== null)
           .sort((a, b) => a - b);
-        const minMixing = mixingNumbers.length > 0 ? Math.min(...mixingNumbers) : null;
-        const maxMixing = mixingNumbers.length > 0 ? Math.max(...mixingNumbers) : null;
-        const mixingRange = minMixing === null || maxMixing === null
-          ? rows[0].mixing_no
-          : minMixing === maxMixing
-            ? `${minMixing}`
-            : `${minMixing}-${maxMixing}`;
+
+        const minMixing = validNumericMixingNumbers.length > 0 ? validNumericMixingNumbers[0] : null;
+        const maxMixing = validNumericMixingNumbers.length > 0 ? validNumericMixingNumbers[validNumericMixingNumbers.length - 1] : null;
+
+        const mixingRange = (() => {
+          if (minMixing === null || maxMixing === null) {
+            return rows[0].mixing_no;
+          }
+
+          if (minMixing === maxMixing) {
+            return `${minMixing}`;
+          }
+
+          return `${minMixing}-${maxMixing}`;
+        })();
 
         const sortedMixingNumbers = [...mixingNumbers];
         const weighted = {
@@ -1660,10 +1679,15 @@ if (!issueData || issueData.length === 0) {
         const uniqueLots = [...new Set(group.rows.map((r) => r.lot_no))];
         const noOfLots = uniqueLots.length;
 
-        const mixingNumbers = [...new Set(group.mixing_nos.map((item) => item.mixing_no))]
-          .map((n) => Number(n))
-          .filter((n) => !Number.isNaN(n))
+        const mixingNumbersRaw = [...new Set(group.mixing_nos.map((item) => item.mixing_no))];
+        const mixingNumbers = mixingNumbersRaw
+          .map((value) => {
+            const num = Number(value);
+            return Number.isNaN(num) ? null : num;
+          })
+          .filter((value) => value !== null)
           .sort((a, b) => a - b);
+
         const minMixing = mixingNumbers.length > 0 ? mixingNumbers[0] : null;
         const maxMixing = mixingNumbers.length > 0 ? mixingNumbers[mixingNumbers.length - 1] : null;
         const mixingRange =

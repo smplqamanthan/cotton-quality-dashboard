@@ -3,6 +3,9 @@ import * as XLSX from "xlsx"; // Excel export
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// Maximum number of rows to display in the table
+const DISPLAY_ROWS_LIMIT = 15;
+
 const normalizeText = (value) => (value === null || value === undefined ? "" : String(value).trim());
 
 const compareText = (a, b) =>
@@ -1072,7 +1075,8 @@ const exportToPDF = () => {
       {loading ? (
         <p className="text-center text-purple-700 font-semibold">Loading...</p>
       ) : summaryData.length > 0 ? (
-        <div className="w-full max-h-[80vh] overflow-auto border border-gray-300 rounded-lg shadow-sm">
+        <>
+          <div className="w-full max-h-[80vh] overflow-auto border border-gray-300 rounded-lg shadow-sm">
           <table className="min-w-full table-auto border-collapse text-center">
             <thead className="sticky top-0 bg-purple-700 text-white text-sm z-10">
               <tr>
@@ -1103,7 +1107,7 @@ const exportToPDF = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedData.map((row, idx) => (
+              {sortedData.slice(0, DISPLAY_ROWS_LIMIT).map((row, idx) => (
                 <tr key={`${row.mixing_no}-${row.cotton}-${row.issue_date}-${idx}`} className="even:bg-gray-100 text-sm">
                   <td className="px-3 py-2 border border-gray-200 whitespace-nowrap">{row.unit}</td>
                   <td className="px-3 py-2 border border-gray-200 whitespace-nowrap">{row.line}</td>
@@ -1154,6 +1158,26 @@ const exportToPDF = () => {
             </tbody>
           </table>
         </div>
+
+          {/* BOTTOM Notification Footer */}
+          {summaryData.length > DISPLAY_ROWS_LIMIT && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              backgroundColor: '#111827',
+              border: '2px dashed #f59e0b',
+              borderRadius: '8px',
+              color: '#f9fafb',
+              textAlign: 'center',
+              fontSize: '14px',
+              fontWeight: '700',
+              letterSpacing: '0.05em',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.35)'
+            }}>
+              ⚠️ <span style={{ color: '#fbbf24', textTransform: 'uppercase' }}>Display limited:</span> Showing only the first {DISPLAY_ROWS_LIMIT} rows. Remaining {summaryData.length - DISPLAY_ROWS_LIMIT} rows are available via the Excel/PDF download buttons above.
+            </div>
+          )}
+        </>
       ) : null}
     </div>
   );
