@@ -1,0 +1,133 @@
+/**
+ * Upload latest 'mixing_chart' Excel file to Supabase using response sheet
+ */
+
+/* ===== CONFIG ===== */
+var RESPONSE_SHEET_ID = '1dqWgV8JMGzBoaRh--S5WxHAIRlQXiWgjWrMEVr-QKEI';
+var RESPONSE_FOLDER_ID = '1DQY4O5J4Elwl6lc2vBGdqRfuZVSP3izZBOTjmTRuXDVmCkM2gtqbaz2k9STh_HHvUIDJ5rqo';
+
+var SUPABASE_URL = 'https://ggejeilssumgaagnyefm.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZWplaWxzc3VtZ2FhZ255ZWZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTIyNjYwMSwiZXhwIjoyMDc0ODAyNjAxfQ.aEhY3cjhYzzZBVSsVhy4MCxNFaxzofxVr7-ZSBmhTl4';  // use service_role key, not anon
+var SUPABASE_TABLE = 'mixing_chart';
+
+var numericColumns = ['unit','line','mixing_no','issue_bale'];
+var dateColumns = ['created'];
+
+/* ===== MAIN ===== */
+function uploadLatestMixingChartFromResponse() {
+  // Step 1: Read latest row from response sheet
+  var ss = SpreadsheetApp.openById(RESPONSE_SHEET_ID);
+  var sheet = ss.getSheets()[0];
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  var lastRowValues = sheet.getRange(lastRow,1,1,sheet.getLastColumn()).getValues()[0];
+
+  var fileUrl = lastRowValues[headers.indexOf('mixing_chart')];
+  if (!fileUrl) { Logger.log("No file URL found in the latest response."); return; }
+
+  var fileId = extractFileId(fileUrl);
+  if (!fileId) { Logger.log("Invalid file URL."); return; }
+
+  Logger.log("Processing file: " + fileUrl);
+
+  // Step 2: Convert Excel -> Google Sheet
+  var tempSheetId = convertExcelToGoogleSheetById(fileId).id;
+  var tempSheet = SpreadsheetApp.openById(tempSheetId).getSheets()[0];
+
+  // Step 3: Normalize/unpivot data
+  var normalizedData = normalizeMixingChart(tempSheet);
+
+  if(normalizedData.length === 0) { 
+    Logger.log("No rows to upload after normalization and ISSUE_BALE > 0 filter.");
+    DriveApp.getFileById(tempSheetId).setTrashed(true);
+    return;
+  }
+
+  // Step 4: Upload to Supabase
+  var inserted = insertBatchMixingChart(normalizedData);
+
+  Logger.log('mixing_chart: uploaded=' + inserted);
+
+  // Step 5: Cleanup
+  try{
+    DriveApp.getFileById(tempSheetId).setTrashed(true); // temp Google Sheet
+    DriveApp.getFileById(fileId).setTrashed(true); // original Excel
+    sheet.deleteRow(lastRow); // delete latest response row
+  }catch(e){ Logger.log("Cleanup failed: " + e); }
+}
+
+/* ===== NORMALIZE / UNPIVOT ===== */
+function normalizeMixingChart(sheet){
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var normalized = [];
+
+  for(var r=1;r<data.length;r++){
+    for(var c=4;c<headers.length;c++){ // Mixing numbers start from column 5 (index 4)
+      var issueBale = formatValue(data[r][c],'issue_bale');
+      if(issueBale !== null && issueBale > 0){
+        normalized.push({
+          unit: formatValue(data[r][0],'unit'),
+          line: formatValue(data[r][1],'line'),
+          cotton: data[r][2].toString(),
+          lot_no: data[r][3].toString(),
+          mixing_no: formatValue(headers[c],'mixing_no'),
+         issue_bale: issueBale,
+         created: Utilities.formatDate(new Date(), Session.getScriptTimeZone(),"yyyy-MM-dd")
+        });
+      }
+    }
+  }
+  return normalized;
+}
+
+/* ===== INSERT TO SUPABASE ===== */
+function insertBatchMixingChart(batchRows) {
+  var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_TABLE;
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Prefer': 'resolution=ignore-duplicates' // skip if duplicate key exists
+    },
+    payload: JSON.stringify(batchRows)
+  };
+
+  var response = UrlFetchApp.fetch(url, options);
+  Logger.log("Supabase response: " + response.getContentText());
+
+  return batchRows.length;
+}
+
+/* ===== UTILITIES ===== */
+function formatValue(val,columnName){
+  if(val===null || val==="") return null;
+  if(numericColumns.includes(columnName)) {
+    var num = parseFloat(val);
+    return isNaN(num)?null:num;
+  }
+  if(dateColumns.includes(columnName)){
+    var d = new Date(val);
+    return isNaN(d.getTime())?null:Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  return val.toString();
+}
+
+function extractFileId(url){ 
+  var m = url.match(/[-\w]{25,}/); return m?m[0]:null; 
+}
+
+function convertExcelToGoogleSheetById(fileId){
+  var file = DriveApp.getFileById(fileId);
+  var blob = file.getBlob();
+  var resource = {
+    title: file.getName(),
+    mimeType: MimeType.GOOGLE_SHEETS
+  };
+  var newFile = Drive.Files.insert(resource, blob, {convert:true});
+  return {id: newFile.id};
+}
